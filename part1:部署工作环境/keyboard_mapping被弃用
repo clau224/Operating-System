@@ -1,0 +1,4 @@
+Bochs出现'keyboard_mapping' is deprecated - use 'keyboard' option instead.解决方法
+keyboard_mapping在bochs的2.6.9版本中被弃用
+配置文件中的是：keyboard_mapping: enabled=0, map=/实际路径/bochs/keymaps/x11-pc-us.map
+根据官方文档，改为：keyboard:  keymap=/实际路径/bochs/keymaps/x11-pc-us.map
