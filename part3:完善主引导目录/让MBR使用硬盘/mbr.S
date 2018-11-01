@@ -1,3 +1,4 @@
+
 %include "boot.inc"
 
 
@@ -57,7 +58,7 @@ SECTION MBR vstart=0x7c00
 	;写入的地址
 	mov bx, LOADER_BASE_ADDR
 	;待读入的扇区数
-	mov cs, 1
+	mov cx, 1
 	;读取程序的起始部分
 	call rd_disk_m_16
 
@@ -70,31 +71,70 @@ SECTION MBR vstart=0x7c00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-rd_disk_m_16
+rd_disk_m_16:
 	mov esi, eax
 	mov di, cx
 ;读写硬盘
-	;设置要读取的扇区数
+;设置要读取的扇区数
 	mov dx, 0x1f
 	mov al, cl
 	out dx, al
 
-	;恢复eax
+;恢复eax
 	mov eax, esi
 
-	;将LBA地址存入0x1f3 ~ 0x1f6
+;将LBA地址存入0x1f3 ~ 0x1f6
 	mov dx, 0x1f3
 	out dx, al
 
 	mov cl, 8
-	mov eax, cl
+	shr eax, cl
 	mov dx, 0x1f4
 	out dx, al
 
-	
-	
+	shr eax, cl
+	mov dx, 0x1f5
+	out dx, al
+
+	shr eax, cl
+	and al, 0x0f
+	or al, 0xe0
+	mov dx, 0x1f6
+	out dx, al
+
+;向0x1f7端口写入读命令0x20
+	mov dx, 0x1f7
+	mov al, 0x20
+	out dx, al
+
+;检测硬盘状态
+    .not_ready:
+;同一端口，写时表示写入命令字，读时表示读入硬盘状态
+	nop
+	in al, dx
+;第三位为1表示硬盘控制器已准备好数据传输，第七位为1表示硬盘忙
+	and al, 0x88
+	cmp al, 0x08
+	jnz .not_ready
 
 
+;从0x1f0端口读取数据
+;di为要读取的扇区数，一个扇区有512字节，每次读入两个字节，即di×256次
+	mov ax, di
+	mov dx, 256
+	mul dx
+	mov cx, ax
+	mov dx, 0x1f0
+    .go_on_read:
+	in ax, dx
+	mov [bx], ax
+	add bx, 2
+	loop .go_on_read
+	
+	ret
+
+    times 510-($-$$) db 0
+    db 0x55, 0xaa
 
 
 
