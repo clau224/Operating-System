@@ -6,7 +6,6 @@ LOADER_STACK_TOP equ LOADER_BASE_ADDR
 
 jmp loader_start
 
-
 ;构建gdt及其内部的描述符
 ;上面的dd定义段描述符低4字节，下面的是高4字节
 ;以下分别为第0段描述符，代码段描述符，数据段及栈段描述符，显存段描述符
@@ -24,7 +23,7 @@ VIDEO_DESC:  dd    0x80000007
 
 GDT_SIZE equ $-GDT_BASE
 GDT_LIMIT equ GDT_SIZE-1
-times 60 dq 0
+times 30 dq 0
 SELECTOR_CODE equ (0x0001<<3) + TI_GDT + RPL0
 SELECTOR_DATA equ (0x0002<<3) + TI_GDT + RPL0
 SELECTOR_VIDEO equ (0x0003<<3) + TI_GDT + RPL0
