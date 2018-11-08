@@ -58,7 +58,7 @@ SECTION MBR vstart=0x7c00
 	;写入的地址
 	mov bx, LOADER_BASE_ADDR
 	;待读入的扇区数
-	mov cx, 1
+	mov cx, 4
 	;读取程序的起始部分
 	call rd_disk_m_16
 
