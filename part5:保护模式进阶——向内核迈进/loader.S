@@ -1,7 +1,7 @@
 
 %include "boot.inc"
 
-section loader vstart = LOADER_BASE_ADDR
+section loader vstart=LOADER_BASE_ADDR
 LOADER_STACK_TOP equ LOADER_BASE_ADDR
 
 
@@ -97,9 +97,56 @@ loader_start:
 	jmp .mem_get_ok
 
 
+    .e801_failed_so_try88:
+	mov ah, 0x88
+	int 0x15
+	jc .error_hlt
+	and eax, 0x0000FFFF
+
+	mov cx, 0x400
+	mul cx
+	shl edx, 16
+	or edx, eax
+	add edx, 0x100000
+
+    .mem_get_ok:
+	mov [total_mem_bytes], edx
 
 
+;准备进入保护模式
+	;打开A20
+	in al, 0x92
+	or al, 0000_0010B
+	out 0x92, al
 
+	;在gdtr寄存器中加载GDT的地址和偏移量
+	lgdt [gdt_ptr]
+
+	;将CR0寄存器的PE位变成1
+	mov eax, cr0
+	or eax, 0x00000001
+	mov cr0, eax
+
+
+	;刷新流水线
+	jmp dword SELECTOR_CODE:p_mode_start
+
+    .error_hlt:
+	hlt
+
+[bits 32]
+p_mode_start:
+	mov ax, SELECTOR_DATA
+	mov ds, ax
+	mov es, ax
+	mov ss, ax
+	mov esp, LOADER_STACK_TOP
+	mov ax, SELECTOR_VIDEO
+	mov gs, ax
+
+	mov byte [gs:160], 'P'
+
+	jmp $
 
 
 
