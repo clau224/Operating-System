@@ -1,5 +1,8 @@
+
 LOADER_BASE_ADDR equ 0x900 
 LOADER_START_SECTOR equ 0x2
+
+PAGE_DIR_TABLE_POS equ 0x100000
 
 
 ;符号名采用的都是“DESC_字段名_字段相关信息”的格式
@@ -29,8 +32,7 @@ DESC_CODE_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + D
 DESC_DATA_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + DESC_LIMIT_DATA2 + DESC_P + DESC_DPL_0 + DESC_S_DATA + DESC_TYPE_DATA + 0x00
 DESC_VIDEO_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + DESC_LIMIT_VIDEO2 + DESC_P + DESC_DPL_0 + DESC_S_DATA + DESC_TYPE_DATA + 0x0b
 
-
-
+;选择子的属性，低两位RPL表示四种特权级，而第三位表示从LDT还是GDT中索引
 RPL0  equ   00b
 RPL1  equ   01b
 RPL2  equ   10b
@@ -39,6 +41,15 @@ TI_GDT  equ   000b
 TI_LDT  equ   100b 
 
 
+;页表相关属性
+PG_P equ 1b
+;表示PDE或PTE指向的物理内存可写或只读
+PG_RW_R equ 00b
+PG_RW_W equ 10b
+;若US为1，则表示任何特权级的任务都可以访问PDE或PTE指向的物理内存
+;若为0，则表示只允许特权级为0,1,2的任务访问
+PG_US_S equ 000b
+PG_US_U equ 100b
 
 
 
