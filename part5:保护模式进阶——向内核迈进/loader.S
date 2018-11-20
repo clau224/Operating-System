@@ -113,7 +113,7 @@ loader_start:
 	mov [total_mem_bytes], edx
 
 
-;准备进入保护模式
+;****准备进入保护模式****
 	;打开A20
 	in al, 0x92
 	or al, 0000_0010B
@@ -145,8 +145,92 @@ p_mode_start:
 	mov gs, ax
 
 	mov byte [gs:160], 'P'
+	jmp $
+
+	
+	;创建页目录及页表并初始化页内存位图
+	call setup_page
+	
+	sgdt [gdt_ptr]
+
+	;将gdt描述符中视频段描述符段基址加0xc0000000，也就是把它挪到内核高地址区
+	mov ebx, [gdt_ptr + 2]
+	;视频段描述符是第三个(序号从0开始)
+	;而且段描述符高4字节的最高字节是段基址的31-24位
+	or dword [ebx + 0x18 + 4], 0xc0000000
+
+	;将gdt的基址和栈指针同样映射到内核地址
+	add dword [gdt_ptr + 2], 0xc0000000
+	add esp, 0xc0000000
+
+	;将页目录地址赋给cr3
+	mov eax, PAGE_DIR_TABLE_POS
+	mov cr3, eax
+	;打开cr0的pg位
+	mov eax, cr0
+	or eax, 0x80000000
+	mov cr0, eax
+
+	;重新加载gdt_ptr
+	lgdt [gdt_ptr]
+
+	mov byte [gs:160], 'V'
 
 	jmp $
+
+
+;****创建页目录及页表****
+setup_page:
+	;先把页目录占用的空间逐字清零
+	;页目录表占据一页4kB，作者逐字节清零
+	mov ecx, 4096
+	mov esi, 0
+    .clear_page_dir:
+	mov byte [PAGE_DIR_TABLE_POS + esi], 0
+	inc esi
+	loop .clear_page_dir
+	
+    	;给页目录表创建页目录项
+    .create_pde:
+	mov eax, PAGE_DIR_TABLE_POS
+	add eax, 0x1000
+	mov ebx, eax    
+	;设置为任何特权级都可访问，且可写
+	or eax, PG_US_U | PG_RW_W | PG_P
+	;将第0个和第768个页目录项设置为第一个页表的位置(0x101000)及上一行的属性
+	mov [PAGE_DIR_TABLE_POS + 0x0], eax
+	mov [PAGE_DIR_TABLE_POS + 0xc00], eax
+	;将最后一个页目录项设置为页目录表自己的位置
+	sub eax, 0x1000
+	mov [PAGE_DIR_TABLE_POS + 4092], eax
+	
+	;创建页表项PTE
+	;因为先只创建loader所在的1MB空间的页表，一共256个
+	mov ecx, 256
+	mov esi, 0
+	mov edx, PG_US_U | PG_RW_W | PG_P
+
+    .create_pte:
+	mov [ebx+esi*4], edx
+	add edx, 4096
+	inc esi
+	loop .create_pte
+
+	;创建内核其他页表的PDE
+	mov eax, PAGE_DIR_TABLE_POS
+	add eax, 0x2000
+	or eax, PG_US_U | PG_RW_W | PG_P
+	mov ebx, PAGE_DIR_TABLE_POS
+	mov ecx, 254
+	mov esi, 769
+    .create_kernel_pde:
+	mov [ebx+esi*4], eax
+	inc esi
+	add eax, 0x1000
+	loop .create_kernel_pde
+	
+	ret
+	
 
 
 
