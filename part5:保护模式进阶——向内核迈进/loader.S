@@ -144,9 +144,13 @@ p_mode_start:
 	mov ax, SELECTOR_VIDEO
 	mov gs, ax
 
-	mov byte [gs:160], 'P'
-	jmp $
 
+	;加载kernal
+	mov eax, KERNEL_START_SECTOR
+	mov ebx, KERNEL_BIN_BASE_ADDR
+	mov ecx, 200
+
+	call rd_disk_m_32
 	
 	;创建页目录及页表并初始化页内存位图
 	call setup_page
@@ -173,6 +177,7 @@ p_mode_start:
 
 	;重新加载gdt_ptr
 	lgdt [gdt_ptr]
+	
 
 	mov byte [gs:160], 'V'
 
@@ -231,15 +236,63 @@ setup_page:
 	
 	ret
 	
+kernel_init:
+	xor eax, eax
+	xor ebx, ebx
+	xor ecx, ecx
+	xor edx, edx
+	;使用dx来记录程序头的大小
+	;使用ebx来记录第一个程序头的偏移量
+	;使用cx来记录有几个程序头
+	mov dx, [KERNEL_BIN_BASE_ADDR + 42]
+	mov ebx, [KERNEL_BIN_BASE_ADDR + 28]
+	add ebx, KERNEL_BIN_BASE_ADDR
+	mov cx, [KERNEL_BIN_BASE_ADDR + 44]
+
+    
+    .each_segment:
+	;查看该程序头是否被使用
+	cmp byte [ebx + 0], PT_NULL
+	je .PTNULL
+
+	;为函数mem_cpy压入参数，参数从左往右依然压入
+	;函数原型类似于mem_cpy(dst, src, size)
+	;先压入size，它位于程序头中偏移量16的位置
+	push dword [ebx + 16]
+
+	mov eax, [ebx + 4]
+	add eax, KERNEL_BIN_BASE_ADDR
+	;压入mem_cpy的第二个参数源地址，第一个参数目的地址
+	push eax
+	push dword [ebx + 8]
+	
+	call mem_cpy
+	add esp, 12
+
+    .PTNULL:
+	add ebx, edx
+	loop .each_segment
+	ret
 
 
+;逐字节拷贝函数mem_cpy, 三个参数dst, src, size
+mem_cpy:
+	cld
+	push ebp
+	mov ebp, esp
+	;因为之后要使用到ecx，所以先备份
+	push ecx
+	mov edi, [ebp + 8]	;目的地址
+	mov esi, [ebp + 12]  	;源地址
+	mov ecx, [ebp + 16] 	;多少个
+	rep movsb
 
+	;把ecx、ebp恢复
+	pop ecx
+	pop ebp
 
-
-
-
-
-
+	ret
+	
 
 
 
