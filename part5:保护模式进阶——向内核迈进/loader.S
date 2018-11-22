@@ -178,13 +178,17 @@ p_mode_start:
 	;重新加载gdt_ptr
 	lgdt [gdt_ptr]
 	
+	jmp SELECTOR_CODE:enter_kernel
+	
+    enter_kernel:
+	call kernel_init
+	mov esp, 0xc009f000
+	jmp KERNEL_ENTRY_POINT
 
-	mov byte [gs:160], 'V'
 
-	jmp $
-
-
-;****创建页目录及页表****
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;****创建页目录及页表****;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 setup_page:
 	;先把页目录占用的空间逐字清零
 	;页目录表占据一页4kB，作者逐字节清零
@@ -235,7 +239,11 @@ setup_page:
 	loop .create_kernel_pde
 	
 	ret
-	
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;将kernel.bin中的sgement地址拷贝到编译的地址;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
 kernel_init:
 	xor eax, eax
 	xor ebx, ebx
@@ -275,7 +283,9 @@ kernel_init:
 	ret
 
 
-;逐字节拷贝函数mem_cpy, 三个参数dst, src, size
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;逐字节拷贝函数mem_cpy, 三个参数dst, src, size;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 mem_cpy:
 	cld
 	push ebp
@@ -294,8 +304,61 @@ mem_cpy:
 	ret
 	
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;读取硬盘的n个扇区;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+rd_disk_m_32:
+	;eax存储 kernel.bin所在的扇区号
+	;ebx存储 数据的写入地址
+	;ecx存储 读入的扇区数
+	mov esi,eax
+	mov di, cx
 
+	;先设置要读取的扇区数
+	mov dx, 0x1f2
+	mov al, cl
+	out dx, al
+	mov eax, esi
 
+	;将LBA地址存入0x1f3-0x1f6
+	mov cl, 8
+	mov dx, 0x1f3
+	out dx, al
+	shr eax, cl
+	mov dx, 0x1f4
+	out dx, al
+	shr eax, cl
+	mov dx, 0x1f5
+	out dx, al
+	shr eax, cl
+	and al, 0x0f
+	or al, 0xe0
+	mov dx, 0x1f6
+	out dx, al
+
+	;向0x1f7端口写入读命令，0x20
+	mov dx,0x1f7
+	mov al, 0x20
+	out dx, al
+
+	;检测硬盘状态
+    .not_ready:
+	nop
+	in al, dx
+	and al, 0x88
+	cmp al, 0x08
+	jnz .not_ready
+	
+	;每次读取一个字节，计算要读取多少次
+	mov ax, di 
+	mov dx, 256
+	mul dx
+	mov cx, ax
+	mov dx, 0x1f0
+    .go_on_read:
+	in ax, dx
+	mov [ebx], ax
+	add ebx, 2
 
 
 

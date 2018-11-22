@@ -1,11 +1,19 @@
-
+;loader被加载到0x900的位置
 LOADER_BASE_ADDR equ 0x900 
+LOADER_STACK_TOP equ LOADER_BASE_ADDR
+
+;loader是在第2个扇区(从0开始)
 LOADER_START_SECTOR equ 0x2
 
-KERNEL_BIN_BASE_ADDR equ 0x70000
-KERNEL_IMAGE_BASE_ADDR  equ   0x1500
 
+;内核文件kernel被加载到0x70000
+KERNEL_BIN_BASE_ADDR equ 0x70000
+;kernel是在第9个扇区
+KERNEL_START_SECTOR equ 0x9
+;页目录表的地址是0x100000
 PAGE_DIR_TABLE_POS equ 0x100000
+;kernel代码段入口地址
+KERNEL_ENTRY_POINT equ 0xc0001500
 
 
 ;符号名采用的都是“DESC_字段名_字段相关信息”的格式
@@ -54,7 +62,7 @@ PG_RW_W equ 10b
 PG_US_S equ 000b
 PG_US_U equ 100b
 
-
+PT_NULL equ 0
 
 
 
