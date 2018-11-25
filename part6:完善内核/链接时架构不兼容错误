@@ -1,0 +1,5 @@
+当shell脚本在执行到ld链接阶段时，提示不兼容
+ld: i386 架构于输入文件 lib/kernel/print.o 与 i386:x86-64 输出不兼容
+报错原因是，nasm编译后的文件是32位的，而链接过程会将32位的print.o，64位的main.o(我的系统是64位ubuntu)链接在一起生成64为可执行的kernel.bin
+所以我们需要使用gcc生成32位main.o文件，同时链接成32为kernel.bin
+修改后的命令行见part6.sh

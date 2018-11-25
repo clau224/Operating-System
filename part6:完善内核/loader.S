@@ -2,7 +2,6 @@
 %include "boot.inc"
 
 section loader vstart=LOADER_BASE_ADDR
-LOADER_STACK_TOP equ LOADER_BASE_ADDR
 
 
 GDT_BASE:  dd    0x00000000
@@ -324,12 +323,15 @@ rd_disk_m_32:
 	mov cl, 8
 	mov dx, 0x1f3
 	out dx, al
+
 	shr eax, cl
 	mov dx, 0x1f4
 	out dx, al
+
 	shr eax, cl
 	mov dx, 0x1f5
 	out dx, al
+
 	shr eax, cl
 	and al, 0x0f
 	or al, 0xe0
@@ -359,6 +361,8 @@ rd_disk_m_32:
 	in ax, dx
 	mov [ebx], ax
 	add ebx, 2
+	loop .go_on_read
+	ret
 
 
 
