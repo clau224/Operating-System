@@ -4,6 +4,13 @@
 [bits 32]
 section .text
 global put_char
+global put_str
+global put_int
+
+section .data
+put_int_buffer dq 0
+
+
 put_char:
 	;先备份32位寄存器环境
 	pushad
@@ -120,6 +127,94 @@ put_char:
     .put_char_done:
 	popad
 	ret
+
+
+put_str:
+	;只用到ecx，ebx两个寄存器
+	push ebx
+	push ecx
+	xor ecx, ecx
+	mov ebx, [esp + 12]
+    .goon:
+	mov cl, [ebx]
+	;判断是不是字符串的结尾'\0'
+	cmp cl, 0
+	jz .str_over
+	;压入put_char的参数
+	push ecx
+	call put_char
+	add esp, 4
+	inc ebx
+	jmp .goon
+    .str_over:
+	pop ecx
+	pop ebx
+	ret
+
+put_int:
+	;将所有的寄存器信息压栈保存
+	pushad
+	mov ebp, esp
+	mov eax, [ebp + 36]
+	mov edx, eax
+	;edi表示在缓冲区第几个位置，0开始，0-7
+	mov edi, 7
+	;ecx存储循环次数
+	mov ecx, 8
+	mov ebx, put_int_buffer
+
+    .16based_4bits:
+	and edx, 0x0000000F
+	cmp edx, 9
+	;若比9大，则说明是由A-F表示的
+	jg .is_AtoF
+	;否则，加上'0'的ascii码，即为该位数字的ascii码
+	add edx, '0'
+	jmp .store
+    .is_AtoF:
+	sub edx, 10
+	add edx, 'A'
+    .store:
+	;在缓冲区中从后向前依次存储
+	mov [ebx + edi], dl
+	dec edi
+	;将eax右移4位，和0x0000000F相与获得后四位
+	shr eax, 4
+	mov edx, eax
+	loop .16based_4bits
+
+    .ready_to_print:
+	;之前的循环中，已把edi减为了-1，所以要将其变为0
+	inc edi
+    .skip_prefix_0:
+	;edi记录当前检查的数字的下角标，若为8，说明0-7都是0，所以这个数是0
+	cmp edi, 8
+	je .full0
+    .goon_skip:
+	mov cl, [put_int_buffer + edi]
+	inc edi
+	;检查是否为0
+	cmp cl, '0'
+	;若是继续检查下一位
+	je .skip_prefix_0
+	;需要将edi中的值减一，来表示第一个非零
+	dec edi
+	jmp .put_each_num
+
+    .full0:
+	mov cl, '0'
+    .put_each_num:
+	;此时，ecx中存放的是第一个非0的数字，edi存放的是该数字的下标
+	push ecx
+	call put_char
+	add esp, 4
+	inc edi
+	mov cl, [put_int_buffer + edi]
+	cmp edi, 8
+	jl .put_each_num
+	popad
+	ret
+
 
 
 
