@@ -1,4 +1,4 @@
-#ifdef __LIB_IO_H
+#ifndef __LIB_IO_H
 #define __LIB_IO_H
 #include "stdint.h"
 
@@ -21,7 +21,9 @@ static inline uint8_t inb(uint16_t port){
 
 //从端口port中读出word_cnt个字符，并写入到addr上
 static inline void insw(uint16_t port, void* addr, uint32_t word_cnt){
-	asm volatile ("cld; rep insw" : "+D" (addr), "+c", (word_cnt) : "d" (port) : "memory");
+	asm volatile ("cld; rep insw" : "+D" (addr), "+c" (word_cnt) : "d" (port) : "memory");
 }
+
+#endif
 
 

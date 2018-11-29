@@ -1,14 +1,14 @@
 
 %include "print.inc"
 
+section .data
+put_int_buffer dq 0
+
 [bits 32]
 section .text
 global put_char
 global put_str
 global put_int
-
-section .data
-put_int_buffer dq 0
 
 
 put_char:
@@ -55,6 +55,28 @@ put_char:
 	jmp .put_other
 
 
+    .is_backspace:
+	dec bx
+	shl bx, 1
+	;写入‘空格’的ascii码
+	mov byte [gs:bx], 0x20
+	inc bx
+	mov byte [gs:bx], 0x07
+	shr bx, 1
+	jmp .set_cursor
+
+
+    .put_other:
+	shl bx, 1
+	mov [gs:bx], cl
+	inc bx
+	mov byte [gs:bx], 0x07
+	shr bx, 1
+	inc bx
+	cmp bx, 2000
+	jl .set_cursor
+
+
     ;若是回车符CR或换行符LF的话，现根据当前坐标求得当前行首坐标
     ;对于回车符CR，求得下一行行首坐标，同时检查是否超出屏幕
     ;对于换行符LF，光标加80即可
@@ -70,27 +92,6 @@ put_char:
 	cmp bx, 2000
     .is_line_feed_end:
 	jl .set_cursor
-
-    .is_backspace:
-	dec bx
-	shl bx, 1
-	;写入‘空格’的ascii码
-	mov byte [gs:bx], 0x20
-	inc bx
-	mov byte [gs:bx], 0x07
-	shr bx, 1
-	jmp .set_cursor
-
-    .put_other:
-	shl bx, 1
-	mov [gs:bx], cl
-	inc bx
-	mov byte [gs:bx], 0x07
-	shr bx, 1
-	inc bx
-	cmp bx, 2000
-	jl .set_cursor
-
 
     
     .roll_screen:
