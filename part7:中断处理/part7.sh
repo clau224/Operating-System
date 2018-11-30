@@ -19,7 +19,7 @@ gcc -m32 -I lib/ -I lib/kernel/ -I kernel/ -I device -c -fno-builtin -o build/ti
 gcc -m32 -I lib/ -I lib/kernel/ -I kernel/ -I device/ -c -fno-builtin -o build/init.o kernel/init.c
 
 ld -m elf_i386 -Ttext 0xc0001500 -e main -o build/kernel.bin build/main.o \
-	build/init.o build/print.o build/interrupt.o build/kernel.o
+	build/init.o build/print.o build/interrupt.o build/kernel.o build/timer.o
 
 dd if=build/mbr.bin of=hd60M.img bs=512 count=1 conv=notrunc
 
