@@ -1,0 +1,3 @@
+在使用gcc编译的时候，会出现“interrupt.c中，对‘__stack_chk_fail’未定义的引用”的报错
+只是因为触发了GCC编译器堆栈保护机制，关闭即可
+只需要添加-fno-stack-protector参数
