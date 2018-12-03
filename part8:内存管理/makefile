@@ -10,7 +10,8 @@ LIB = -I lib/ -I lib/kernel/ -I kernel/ -I device/
 LIB_PRINT = -I lib/kernel/include/
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o \
-      $(BUILD_DIR)/debug.o
+      $(BUILD_DIR)/debug.o $(BUILD_DIR)/string.o $(BUILD_DIR)/bitmap.o \
+	  $(BUILD_DIR)/memory.o
 
 ASFLAGS = -f elf
 CFLAGS = $(LIB) -c -fno-builtin -fno-stack-protector
@@ -32,6 +33,16 @@ $(BUILD_DIR)/timer.o: device/timer.c device/timer.h lib/stdint.h\
 	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/debug.o: kernel/debug.c kernel/debug.h \
         lib/kernel/print.h lib/stdint.h kernel/interrupt.h
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/string.o: lib/string.c lib/string.h kernel/global.h \
+		kernel/debug.h
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/bitmap.o: lib/kernel/bitmap.c lib/kernel/bitmap.h \
+		lib/stdint.h lib/string.h lib/kernel/print.h kernel/interrupt.h \
+		kernel/debug.h
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/memory.o: kernel/memory.c kernel/memory.h \
+		lib/stdint.h lib/kernel/print.h
 	$(CC) $(CFLAGS) $< -o $@
 
 

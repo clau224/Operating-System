@@ -13,7 +13,7 @@ void memset(void* dst_, uint8_t value, uint32_t size){
 
 /*memcpy函数*/
 void memcpy(void* dst_, const void* src_, uint32_t size){
-	ASSERT(dst_ != NULL && src__ != NULL);
+	ASSERT(dst_ != NULL && src_ != NULL);
 	uint8_t* dst = (uint8_t*)dst_;
 	const uint8_t* src = src_;
 	while(size-- > 0){
@@ -22,8 +22,8 @@ void memcpy(void* dst_, const void* src_, uint32_t size){
 }
 
 /*memcmp函数*/
-int strcmp(const void* a_, const void* b_, uint32_t size){
-	ASSERT(a != NULL || b != NULL);
+int memcmp(const void* a_, const void* b_, uint32_t size){
+	ASSERT(a_ != NULL || b_ != NULL);
 	const char *a = a_, *b = b_;
 	while(size-- > 0){
 		if(*a != *b){
@@ -31,6 +31,30 @@ int strcmp(const void* a_, const void* b_, uint32_t size){
 		}
 		a++, b++;
 	}
+	return 0;
+}
+
+/*strcpy函数*/
+char* strcpy(char* dst_, const char* src_){
+	ASSERT(dst_ != NULL && src_ != NULL);
+	char* r = dst_;
+	while(*dst_++ = *src_++);
+	return r;
+}
+
+/*返回字符串长度strlen函数*/
+uint32_t strlen(const char* str){
+	ASSERT(str != NULL);
+	const char* p = str;
+	while(*p++);
+	return p-str-1;
+}
+
+/*strcmp字符串比较函数*/
+int8_t strcmp(const char* a, const char* b){
+	ASSERT(a != NULL && b!= NULL);
+	while(*a != 0 && *b == *a)
+		a++, b++;
 	return *a == 0 ? -1 : (*a == *b ? 0 : 1);
 }
 
@@ -39,10 +63,11 @@ char* strchr(const char* str, const uint8_t ch){
 	ASSERT(str != NULL);
 	while(*str != 0){
 		if(*str == ch){
-			return str;		
+			return (char*)str;		
 		}
 		str++;
 	}
+	return NULL;
 }
 
 /*这个是从后往前找*/
@@ -55,7 +80,7 @@ char* strrchr(const char* str, const uint8_t ch){
 		}
 		str++;	
 	}
-	return ansstr;
+	return (char*)ansstr;
 }
 
 /*strcat是拼接两个字符串，把src拼接到dst后面*/
@@ -67,11 +92,12 @@ char* strcat(char* dst_, const char* src_){
 	//这一步还是很巧妙地，先给dst指向的内存赋src指向的值val
 	//然后dst和src同时向后移动，然后检查val是否为'\0'，不是则接着循环
 	while(*dst++ = *src_++);
+	return dst_;
 }
 
 /*在字符串中查找目标字符出现的次数*/
 uint32_t strchrs(const char* str_, uint8_t ch){
-	ASSERT(str != NULL);
+	ASSERT(str_ != NULL);
 	uint32_t ch_cnt = 0;
 	const char* str = str_;
 	while(*str != 0){
