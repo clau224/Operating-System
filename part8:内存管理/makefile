@@ -20,7 +20,7 @@ LDFLAGS = -Ttext $(ENTRY_POINT) -e main
 
 
 $(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h lib/stdint.h \
-	kernel/init.h
+	kernel/init.h kernel/memory.h
 	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/init.o: kernel/init.c kernel/init.h lib/kernel/print.h \
 	lib/stdint.h kernel/interrupt.h device/timer.h
@@ -41,8 +41,8 @@ $(BUILD_DIR)/bitmap.o: lib/kernel/bitmap.c lib/kernel/bitmap.h \
 		lib/stdint.h lib/string.h lib/kernel/print.h kernel/interrupt.h \
 		kernel/debug.h
 	$(CC) $(CFLAGS) $< -o $@
-$(BUILD_DIR)/memory.o: kernel/memory.c kernel/memory.h \
-		lib/stdint.h lib/kernel/print.h
+$(BUILD_DIR)/memory.o: kernel/memory.c kernel/memory.h lib/string.h \
+		lib/stdint.h lib/kernel/print.h kernel/debug.h
 	$(CC) $(CFLAGS) $< -o $@
 
 

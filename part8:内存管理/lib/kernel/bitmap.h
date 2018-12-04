@@ -1,5 +1,5 @@
 #ifndef __LIB_KERNEL_BITMAP_H
-#define __LIB_KERBEL_BITMAP_H
+#define __LIB_KERNEL_BITMAP_H
 
 #include "global.h"
 #define BITMAP_MASK 1
