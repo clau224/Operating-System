@@ -11,16 +11,16 @@ LIB_PRINT = -I lib/kernel/include/
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o \
       $(BUILD_DIR)/debug.o $(BUILD_DIR)/string.o $(BUILD_DIR)/bitmap.o \
-	  $(BUILD_DIR)/memory.o $(BUILD_DIR)/thread.o
+	  $(BUILD_DIR)/memory.o $(BUILD_DIR)/thread.o $(BUILD_DIR)/switch.o \
+	  $(BUILD_DIR)/list.o
 
 ASFLAGS = -f elf
 CFLAGS = $(LIB) -c -fno-builtin -fno-stack-protector
 LDFLAGS = -Ttext $(ENTRY_POINT) -e main
 
 
-
 $(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h lib/stdint.h \
-	kernel/init.h kernel/memory.h thread/thread.h
+	kernel/init.h kernel/memory.h thread/thread.h kernel/interrupt.h
 	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/init.o: kernel/init.c kernel/init.h lib/kernel/print.h \
 	lib/stdint.h kernel/interrupt.h device/timer.h
@@ -28,8 +28,9 @@ $(BUILD_DIR)/init.o: kernel/init.c kernel/init.h lib/kernel/print.h \
 $(BUILD_DIR)/interrupt.o: kernel/interrupt.c kernel/interrupt.h \
 	lib/stdint.h kernel/global.h lib/kernel/io.h lib/kernel/print.h
 	$(CC) $(CFLAGS) $< -o $@
-$(BUILD_DIR)/timer.o: device/timer.c device/timer.h lib/stdint.h\
-        lib/kernel/io.h lib/kernel/print.h
+$(BUILD_DIR)/timer.o: device/timer.c device/timer.h lib/stdint.h \
+        lib/kernel/io.h lib/kernel/print.h kernel/interrupt.h \
+		thread/thread.h kernel/debug.h
 	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/debug.o: kernel/debug.c kernel/debug.h \
         lib/kernel/print.h lib/stdint.h kernel/interrupt.h
@@ -44,8 +45,11 @@ $(BUILD_DIR)/bitmap.o: lib/kernel/bitmap.c lib/kernel/bitmap.h \
 $(BUILD_DIR)/memory.o: kernel/memory.c kernel/memory.h lib/string.h \
 		lib/stdint.h lib/kernel/print.h kernel/debug.h
 	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/list.o: lib/kernel/list.c lib/kernel/list.h kernel/interrupt.h
+	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/thread.o: thread/thread.c thread/thread.h lib/stdint.h \
-		kernel/global.h kernel/memory.h lib/string.h
+		kernel/global.h kernel/memory.h lib/string.h lib/kernel/print.h \
+		kernel/debug.h kernel/interrupt.h
 	$(CC) $(CFLAGS) $< -o $@
 
 
@@ -53,6 +57,8 @@ $(BUILD_DIR)/kernel.o: kernel/kernel.S
 	$(AS) $(ASFLAGS) $< -o $@
 $(BUILD_DIR)/print.o: lib/kernel/print.S lib/kernel/include/print.inc
 	$(AS) $(ASFLAGS) $(LIB_PRINT) $< -o $@
+$(BUILD_DIR)/switch.o: thread/switch.S
+	$(AS) $(ASFLAGS) $< -o $@
 
 
 $(BUILD_DIR)/kernel.bin: $(OBJS)

@@ -1,4 +1,5 @@
 #include "interrupt.h"
+#include "stdint.h"
 #include "global.h"
 #include "io.h"
 #include "print.h"
@@ -86,9 +87,25 @@ static void idt_desc_init(void){
 static void general_intr_handler(uint8_t vec_nr){
 	if(vec_nr == 0x27 || vec_nr == 0x2f)
 		return;
-	put_str("int vector : 0x");
-	put_int(vec_nr);
-	put_char('\n');
+
+	set_cursor(0);
+	int cursor_pos = 0;
+	while(cursor_pos < 320){
+		put_char(' ');
+		cursor_pos++;
+	}	
+	set_cursor(0);
+	put_str(" !!! excetion message begin !!! \n");	
+	set_cursor(84);
+	put_str(intr_name[vec_nr]);
+	if(vec_nr == 14){
+		int page_fault_vaddr = 0;
+		asm("movl %%cr2, %0" : "=r" (page_fault_vaddr));
+		put_str("\n page fault addr is ");
+		put_int(page_fault_vaddr);
+	}
+	put_str("\n !!! excetion message end !!! \n");
+	while(1);
 }
 
 //完成中断处理函数注册及异常名称注册
@@ -96,7 +113,7 @@ static void exception_init(void){
 	int i;
 	for(i=0; i<IDT_DESC_CNT; i++){
 		idt_table[i] = general_intr_handler;
-		intr_name[i] = "unknown";	
+		intr_name[i] = "unknown";
 	}
 	intr_name[0] = "#DE Divide Error";
 	intr_name[1] = "#DB Debug Exception";
@@ -118,6 +135,11 @@ static void exception_init(void){
    	intr_name[17] = "#AC Alignment Check Exception";
    	intr_name[18] = "#MC Machine-Check Exception";
    	intr_name[19] = "#XF SIMD Floating-Point Exception";
+}
+
+//中断处理程序数组中，第vector_no个元素处注册安装中断处理程序function
+void register_handler(uint8_t vector_no, intr_handler function){
+	idt_table[vector_no] = function;	
 }
 
 

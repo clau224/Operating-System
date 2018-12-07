@@ -216,6 +216,31 @@ put_int:
 	popad
 	ret
 
+global set_cursor
+set_cursor:
+   	pushad
+   	mov bx, [esp+36]
+
+	;索引寄存器
+   	mov dx, 0x03d4		
+	;光标位置的高8位	
+   	mov al, 0x0e		
+   	out dx, al
+	;通过读写数据端口0x3d5来获得或设置光标位置
+   	mov dx, 0x03d5			 
+   	mov al, bh
+   	out dx, al
+
+   	mov dx, 0x03d4
+	;再设置低8位
+   	mov al, 0x0f
+   	out dx, al
+   	mov dx, 0x03d5 
+   	mov al, bl
+   	out dx, al
+   	popad
+   	ret
+
 
 
 

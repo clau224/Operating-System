@@ -18,6 +18,8 @@ enum intr_status intr_enable();
 enum intr_status intr_disable();
 //将中断状态设置为status
 enum intr_status intr_set_status(enum intr_status status);
+//设置中断处理程序
+void register_handler(uint8_t vector_no, intr_handler function);
 
 
 #endif
