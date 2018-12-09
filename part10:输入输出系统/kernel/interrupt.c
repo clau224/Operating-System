@@ -5,7 +5,7 @@
 #include "print.h"
 
 //总共支持的中断数
-#define IDT_DESC_CNT 0x21
+#define IDT_DESC_CNT 0x30
 //主片的控制端口，0x20
 #define PIC_M_CTRL 0x20
 //主片的数据端口，0x21
@@ -56,9 +56,10 @@ static void pic_init(void){
 	outb (PIC_S_DATA, 0x28);
 	outb (PIC_S_DATA, 0x02);
 	outb (PIC_S_DATA, 0x01);
-	//打开主片上IR0,也就是目前只接受时钟产生的中断
-	outb (PIC_M_DATA, 0xfe);
-	outb (PIC_S_DATA, 0xff);
+
+	//打开键盘中断与时钟中断
+	outb(PIC_M_DATA, 0xfc);
+	outb(PIC_S_DATA, 0xff);
 
 	put_str("   pic_init done\n");
 }
@@ -185,19 +186,6 @@ enum intr_status intr_disable(){
 enum intr_status intr_set_status(enum intr_status status){
 	return status & INTR_ON ? intr_enable() : intr_disable();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -36,6 +36,7 @@ static void intr_timer_handler(void){
 		schedule();
 	else
 		cur_thread->ticks--;
+	return;
 }
 
 void timer_init(void){
