@@ -1,0 +1,69 @@
+;loader被加载到0x900的位置
+LOADER_BASE_ADDR equ 0x900 
+LOADER_STACK_TOP equ LOADER_BASE_ADDR
+
+;loader是在第2个扇区(从0开始)
+LOADER_START_SECTOR equ 0x2
+
+
+;内核文件kernel被加载到0x70000
+KERNEL_BIN_BASE_ADDR equ 0x70000
+;kernel是在第9个扇区
+KERNEL_START_SECTOR equ 0x9
+;页目录表的地址是0x100000
+PAGE_DIR_TABLE_POS equ 0x100000
+;kernel代码段入口地址
+KERNEL_ENTRY_POINT equ 0xc0001500
+
+
+;符号名采用的都是“DESC_字段名_字段相关信息”的格式
+;数值结尾的b表示二进制，nasm编译器编译阶段会忽略‘_’
+DESC_G_4K   equ	  1_00000000000000000000000b   
+DESC_D_32   equ	   1_0000000000000000000000b
+DESC_L	    equ	    0_000000000000000000000b	
+DESC_AVL    equ	     0_00000000000000000000b	 
+DESC_LIMIT_CODE2  equ 1111_0000000000000000b
+DESC_LIMIT_DATA2  equ DESC_LIMIT_CODE2
+DESC_LIMIT_VIDEO2 equ 0000_000000000000000b
+DESC_P	    equ		  1_000000000000000b
+DESC_DPL_0  equ		   00_0000000000000b
+DESC_DPL_1  equ		   01_0000000000000b
+DESC_DPL_2  equ		   10_0000000000000b
+DESC_DPL_3  equ		   11_0000000000000b
+DESC_S_CODE equ		     1_000000000000b
+DESC_S_DATA equ	  DESC_S_CODE
+DESC_S_sys  equ		     0_000000000000b
+DESC_TYPE_CODE  equ	      1000_00000000b	
+DESC_TYPE_DATA  equ	      0010_00000000b	
+
+
+;定义代码段、数据段高4字节，平坦模式，段基址是0
+;可参考P4.3段描述符格式
+DESC_CODE_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + DESC_LIMIT_CODE2 + DESC_P + DESC_DPL_0 + DESC_S_CODE + DESC_TYPE_CODE + 0x00
+DESC_DATA_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + DESC_LIMIT_DATA2 + DESC_P + DESC_DPL_0 + DESC_S_DATA + DESC_TYPE_DATA + 0x00
+DESC_VIDEO_HIGH4 equ (0x00 << 24) + DESC_G_4K + DESC_D_32 + DESC_L + DESC_AVL + DESC_LIMIT_VIDEO2 + DESC_P + DESC_DPL_0 + DESC_S_DATA + DESC_TYPE_DATA + 0x0b
+
+;选择子的属性，低两位RPL表示四种特权级，而第三位表示从LDT还是GDT中索引
+RPL0  equ   00b
+RPL1  equ   01b
+RPL2  equ   10b
+RPL3  equ   11b
+TI_GDT  equ   000b
+TI_LDT  equ   100b 
+
+
+;页表相关属性
+PG_P equ 1b
+;表示PDE或PTE指向的物理内存可写或只读
+PG_RW_R equ 00b
+PG_RW_W equ 10b
+;若US为1，则表示任何特权级的任务都可以访问PDE或PTE指向的物理内存
+;若为0，则表示只允许特权级为0,1,2的任务访问
+PG_US_S equ 000b
+PG_US_U equ 100b
+
+PT_NULL equ 0
+
+
+
+
