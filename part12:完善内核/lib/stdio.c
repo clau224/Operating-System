@@ -25,25 +25,13 @@ static void itoa(uint32_t value, char** buf, uint8_t base){
 	strrev(buf_origin, (*buf)-1);
 }
 
-/* 将整型转换成字符(integer to ascii) */
-/*static void itoa(uint32_t value, char** buf_ptr_addr, uint8_t base) {
-   uint32_t m = value % base;	    // 求模,最先掉下来的是最低位   
-   uint32_t i = value / base;	    // 取整
-   if (i) {			    // 如果倍数不为0则递归调用。
-      itoa(i, buf_ptr_addr, base);
-   }
-   if (m < 10) {      // 如果余数是0~9
-      *((*buf_ptr_addr)++) = m + '0';	  // 将数字0~9转换为字符'0'~'9'
-   } else {	      // 否则余数是A~F
-      *((*buf_ptr_addr)++) = m - 10 + 'A'; // 将数字A~F转换为字符'A'~'F'
-   }
-}*/
-
+//函数返回值是经过格式转换后的字符串长度
 uint32_t vsprintf(char* str, const char* format, va_list ap){
 	char* str_ = str;
 	const char* format_ = format;
 	char index_char = *format_;
 	int32_t arg_int;
+	char* arg_str;
 	while(index_char){
 		if(index_char != '%'){
 			*(str_) = index_char;
@@ -53,12 +41,32 @@ uint32_t vsprintf(char* str, const char* format, va_list ap){
 		}
 		index_char = *(++format_);
 		switch(index_char){
+			//输出16进制
 			case 'x':
 				arg_int = va_arg(ap, int);
 				itoa(arg_int, &str_, 16);
-				index_char = *(++format_);
+				break;
+			//输出10进制
+			case 'd':
+				arg_int = va_arg(ap, int);
+				if(arg_int < 0){
+					arg_int = -arg_int;
+					*str_++ = '-';
+				}
+				itoa(arg_int, &str_, 10);
+				break;
+			//输出字符
+			case 'c':
+				*(str_++) = va_arg(ap, char);
+				break;
+			//输出字符串
+			case 's':
+				arg_str = va_arg(ap, char*);
+				strcpy(str_, arg_str);
+				str_ += strlen(arg_str);
 				break;
 		}
+		index_char = *(++format_);
 	}
 	return strlen(str);
 }
@@ -71,4 +79,12 @@ uint32_t printf(const char* format, ...){
 	vsprintf(buf, format, args);
 	va_end(args);
 	return write(buf);
+}
+
+uint32_t sprintf(char* buf, const char* format, ...){
+	va_list args;
+	va_start(args, format);
+	uint32_t retval = vsprintf(buf, format, args);
+	va_end(args);
+	return retval;
 }

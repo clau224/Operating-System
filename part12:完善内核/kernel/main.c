@@ -31,23 +31,21 @@ int main(void){
 	console_put_str("  main_pid:0x");
 	console_put_int(sys_getpid());
 	console_put_char('\n');
-	thread_start("k_thread_a", 31, k_thread_a, "argA");
-	thread_start("k_thread_b", 31, k_thread_b, "argB");
+	thread_start("k_thread_a", 31, k_thread_a, "NULL");
+	thread_start("k_thread_b", 31, k_thread_b, "NULL");
     
 	while(1);
     return 0;
 }
 
-void k_thread_a(void* arg){
-	char* para = arg;
+void k_thread_a(void* str){
    	console_put_str("kernel thread A pid is 0x");
 	console_put_int(sys_getpid());
 	console_put_char('\n');
 	while(1);
 }
 
-void k_thread_b(void* arg){
-	char* para = arg;
+void k_thread_b(void* str){
    	console_put_str("kernel thread B pid is 0x");
 	console_put_int(sys_getpid());
 	console_put_char('\n');
@@ -55,11 +53,11 @@ void k_thread_b(void* arg){
 }
 
 void u_prog_a(void){
-	printf("user process A pid is 0x%x\n", getpid());
+	printf("Hello~ My name is %s, my pid is %d\n", gettname(), getpid());
 	while(1);
 }
 
 void u_prog_b(void){
-	printf("user process B pid is 0x%x\n", getpid());
-	while(1);	
+	printf("Hello~ My name is %s, my pid is %d\n", gettname(), getpid());
+	while(1);
 }

@@ -5,11 +5,13 @@
 
 enum SYSCALL_NR {
    SYS_GETPID,
-   SYS_WRITE
+   SYS_WRITE,
+   SYS_GETTNAME
 };
 
 uint32_t getpid(void);
 uint32_t write(char* str);
+char* gettname(void);
 
 #endif
 

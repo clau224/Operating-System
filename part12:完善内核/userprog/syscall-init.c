@@ -14,6 +14,10 @@ uint32_t sys_getpid(void){
 	return get_thread_ptr()->pid;
 }
 
+uint32_t sys_gettname(void){
+	return (uint32_t)get_thread_ptr()->name;
+}
+
 uint32_t sys_write(char* str){
 	console_put_str(str);
 	return strlen(str);
@@ -23,5 +27,6 @@ void syscall_init(void){
 	put_str("syscall_init start\n");
 	syscall_table[SYS_GETPID] = sys_getpid;
 	syscall_table[SYS_WRITE] = sys_write;
+	syscall_table[SYS_GETTNAME] = sys_gettname;
 	put_str("syscall_init done\n");
 }

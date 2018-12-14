@@ -15,10 +15,14 @@ enum pool_flags{
 #define PG_US_S 0
 #define PG_US_U 4
 
+#define DESC_CNT 7
+
 struct virtual_addr{
 	struct bitmap vaddr_bitmap;
 	uint32_t vaddr_start;
 };
+
+
 
 extern struct pool kernel_pool, user_pool;
 
