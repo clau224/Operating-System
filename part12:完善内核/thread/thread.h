@@ -82,6 +82,9 @@ struct task_struct{
 
 	//用户进程的虚拟地址
 	struct virtual_addr userprog_vaddr;
+
+	//用户进程内存块描述符
+	struct mem_block_desc user_block_desc[DESC_CNT];
 	
 	//自己定义的魔数，目测作者设置的是自己生日～～
 	uint32_t stack_magic;

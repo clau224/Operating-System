@@ -72,7 +72,7 @@ void bitmap_set(struct bitmap* btmp, uint32_t bit_idx, int8_t value){
 		btmp->bits[byte_idx] = btmp->bits[byte_idx] | 0x01 << bit_odd;	
 	}
 	else{
-		btmp->bits[byte_idx] = btmp->bits[byte_idx] & 0xFE << bit_odd;
+		btmp->bits[byte_idx] = btmp->bits[byte_idx] & ~(0x01 << bit_odd);
 	}
 }
 

@@ -5,6 +5,9 @@
 #include "string.h"
 #include "sync.h"
 #include "thread.h"
+#include "interrupt.h"
+#include "list.h"
+#include "bitmap.h"
 
 #define PG_SIZE 4096
 #define MEM_BITMAP_BASE 0xc009a000
@@ -17,6 +20,13 @@ struct pool{
 	struct lock lock;
 };
 
+struct arena{
+	struct mem_block_desc* desc;
+	uint32_t cnt;
+	bool large;
+};
+
+struct mem_block_desc k_block_descs[DESC_CNT];
 struct pool kernel_pool, user_pool;
 struct virtual_addr kernel_vaddr;
 
@@ -124,9 +134,11 @@ void* malloc_page(enum pool_flags pf, uint32_t pg_cnt){
 
 //从内核物理内存池申请pg_cnt页内存
 void* get_kernel_pages(uint32_t pg_cnt){
+	lock_acquire(&kernel_pool.lock);
 	void* vaddr = malloc_page(PF_KERNEL, pg_cnt);
 	if(vaddr != NULL)
 		memset(vaddr, 0, pg_cnt * PG_SIZE);
+	lock_release(&kernel_pool.lock);
 	return vaddr;
 }
 
@@ -237,16 +249,229 @@ static void mem_pool_init(uint32_t all_mem){
 	put_str("    mem_pool_init done\n");
 }
 
+void block_desc_init(struct mem_block_desc* desc_array){
+	uint16_t block_size = 16;
+	uint16_t i;
+	for(i = 0; i<DESC_CNT; i++){
+		desc_array[i].block_size = block_size;
+		desc_array[i].blocks_per_arena = (PG_SIZE - sizeof(struct arena)) / block_size;
+		list_init(&desc_array[i].free_list);
+		block_size *= 2;
+	}
+}
 
 void mem_init(){
 	put_str("mem_init start\n");
 	uint32_t mem_bytes_total = (*(uint32_t*)(0xb00));
 	mem_pool_init(mem_bytes_total);
+	block_desc_init(k_block_descs);
 	put_str("mem_init done\n");
 }
 
 
+/*返回arena块中，第idx个块的地址*/
+static struct mem_block* arenatoblock(struct arena* a, uint32_t idx){
+	return (struct mem_block*) ((uint32_t)a + sizeof(struct arena) + idx*a->desc->block_size);
+}
+/*返回mem_block块所在的arena*/
+static struct arena* blocktoarena(struct mem_block* b){
+	return (struct arena*)((uint32_t)b & 0xfffff000);
+}
 
 
+void* sys_malloc(uint32_t size){
+	enum pool_flags pf;
+	struct pool* mem_pool;
+	uint32_t pool_size;
+	struct mem_block_desc* descs;
+	struct task_struct* cur = get_thread_ptr();
+
+	//如果是内核线程
+	if(cur->pgdir == NULL){
+		pf = PF_KERNEL;
+		pool_size = kernel_pool.pool_size;
+		mem_pool = &kernel_pool;
+		descs = k_block_descs;
+	}
+	else{
+		pf = PF_USER;
+		pool_size = user_pool.pool_size;
+		mem_pool = &user_pool;
+		descs = cur->user_block_desc;
+	}
+
+	if(!(size > 0 && size < pool_size))
+		return NULL;
+
+	struct arena* a;
+	struct mem_block* b;
+	lock_acquire(&mem_pool->lock);
+	//大于1k则直接申请页框
+	if(size > 1024){
+		uint32_t page_cnt = DIV_ROUND_UP(size + sizeof(struct arena), PG_SIZE);
+		a = malloc_page(pf, page_cnt);
+		if(a != NULL){
+			memset(a, 0, page_cnt * PG_SIZE);
+			a->desc = NULL;
+			a->cnt = page_cnt;
+			a->large = true;
+			lock_release(&mem_pool->lock);
+			return (void*)(a+1);
+		}
+		else{
+			lock_release(&mem_pool->lock);
+			return NULL;
+		}
+	}
+	else{
+		uint8_t i;
+		//16、32、64、128、256、512、1024选择相匹配的一档
+		for(i = 0; i<DESC_CNT; i++){
+			if(size <= descs[i].block_size)
+				break;
+		}
+		if(list_empty(&descs[i].free_list)){
+			a = malloc_page(pf, 1);
+			if(a == NULL){
+				lock_release(&mem_pool->lock);
+				return NULL;
+			}
+			memset(a, 0, PG_SIZE);
+
+			a->desc = &descs[i];
+			a->large = false;
+			a->cnt = descs[i].blocks_per_arena;
+
+			enum intr_status old_status = intr_disable();
+			uint32_t j;
+			for(j = 0; j<descs[i].blocks_per_arena; j++){
+				b = arenatoblock(a, j);
+				ASSERT(!elem_find(&a->desc->free_list, &b->free_elem));
+				list_append(&a->desc->free_list, &b->free_elem);
+			}
+			intr_set_status(old_status);
+		}
+		b = elemtoentry(struct mem_block, free_elem, list_pop(&(descs[i].free_list)));
+		memset(b, 0, descs[i].block_size);
+		a = blocktoarena(b);
+		a->cnt--;
+		lock_release(&mem_pool->lock);
+		return (void*)b;
+	}
+}
 
 
+/*将物理地址回收到内核物理内存池/用户物理内存池*/
+void pfree(uint32_t pg_phy_addr){
+	struct pool* mem_pool;
+	uint32_t bit_idx = 0;
+	if(pg_phy_addr >= user_pool.phy_addr_start){
+		mem_pool = &user_pool;
+		bit_idx = (pg_phy_addr - user_pool.phy_addr_start)/PG_SIZE;
+	}
+	else{
+		mem_pool = &kernel_pool;
+		bit_idx = (pg_phy_addr - kernel_pool.phy_addr_start)/PG_SIZE;
+	}
+	bitmap_set(&mem_pool->pool_bitmap, bit_idx, 0);
+}
+
+/*将指定虚拟地址的所在页的存在位设置为0*/
+static void page_table_pte_remove(uint32_t vaddr) {
+   uint32_t* pte = pte_ptr(vaddr);
+   (*pte) &= (~PG_P_1);	
+   //更新快表
+   asm volatile ("invlpg %0" : : "m" (vaddr) : "memory");
+}
+
+/*虚拟内存池中释放以vaddr为起始的连续pg_cnt个页*/
+static void vaddr_remove(enum pool_flags pf, void* _vaddr, uint32_t pg_cnt){
+	uint32_t bit_start, vaddr = (uint32_t)_vaddr;
+	if(pf == PF_KERNEL){
+		bit_start = (vaddr - kernel_vaddr.vaddr_start)/PG_SIZE;
+		uint32_t cnt = 0;
+		for(cnt; cnt < pg_cnt; cnt++){
+			bitmap_set(&kernel_vaddr.vaddr_bitmap, bit_start+cnt, 0);
+		}
+	}
+	else{
+		struct task_struct* cur = get_thread_ptr();
+		bit_start = (vaddr - cur->userprog_vaddr.vaddr_start)/PG_SIZE;
+		uint32_t cnt = 0;
+		for(cnt; cnt < pg_cnt; cnt++){
+			bitmap_set(&cur->userprog_vaddr.vaddr_bitmap, bit_start+cnt, 0);
+		}
+	}
+}		
+
+void mfree_page(enum pool_flags pf, void* _vaddr, uint32_t pg_cnt){
+	uint32_t phy_addr, vaddr = (uint32_t)_vaddr;
+	ASSERT(pg_cnt >= 1 && vaddr % PG_SIZE == 0);
+	phy_addr = addr_virtual_to_phy(vaddr);
+	ASSERT((phy_addr % PG_SIZE) == 0 && phy_addr >= 0x102000);
+
+	uint32_t i = 0;
+	if(phy_addr >= user_pool.phy_addr_start){
+		vaddr -= PG_SIZE;
+		while(i < pg_cnt){
+			vaddr += PG_SIZE;
+			phy_addr = addr_virtual_to_phy(vaddr);
+			pfree(phy_addr);
+			page_table_pte_remove(vaddr);
+			i++;
+		}
+		vaddr_remove(pf, _vaddr, pg_cnt);
+	}
+	else{
+		vaddr -= PG_SIZE;
+		while(i < pg_cnt){
+			vaddr += PG_SIZE;
+			phy_addr = addr_virtual_to_phy(vaddr);
+			ASSERT(phy_addr >= kernel_pool.phy_addr_start && \
+				phy_addr < user_pool.phy_addr_start);
+			pfree(phy_addr);
+			page_table_pte_remove(vaddr);
+			i++;
+		}
+		vaddr_remove(pf, _vaddr, pg_cnt);
+	}
+}
+
+void sys_free(void* ptr){
+	ASSERT(ptr != NULL);
+	if(ptr != NULL){
+		enum pool_flags pf;
+		struct pool* mem_pool;
+		if(get_thread_ptr()->pgdir == NULL){
+			ASSERT((uint32_t)ptr >= K_HEAP_START);
+			pf = PF_KERNEL;
+			mem_pool = &kernel_pool;
+		}
+		else{
+			pf = PF_USER;
+			mem_pool = &user_pool;
+		}
+
+		lock_acquire(&mem_pool->lock);
+		struct mem_block* b = ptr;
+		struct arena* a = blocktoarena(b);
+
+		if(a->desc == NULL && a->large == true){
+			mfree_page(pf, a, a->cnt);
+		}
+		else{
+			list_append(&a->desc->free_list, &b->free_elem);
+			//如果arena全都是空闲的，那就释放
+			if(++a->cnt == a->desc->blocks_per_arena){
+				uint32_t idx;
+				for(idx = 0; idx < a->desc->blocks_per_arena; idx++){
+					struct mem_block* b = arenatoblock(a, idx);
+					ASSERT(elem_find(&a->desc->free_list, &b->free_elem));
+					list_remove(&b->free_elem);
+				}
+				mfree_page(pf, a, 1);
+			}
+		}
+		lock_release(&mem_pool->lock);
+	}
+}
