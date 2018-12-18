@@ -14,6 +14,8 @@
 
 //主线程PCB
 struct task_struct* main_thread;
+//idle线程
+struct task_struct* idle_thread;
 //就绪任务队列
 struct list thread_ready_list;
 //所有任务队列
@@ -104,6 +106,25 @@ static void make_main_thread(void){
 	list_append(&thread_all_list, &main_thread->all_list_tag);
 }
 
+static void idle(void* arg UNUSED){
+	while(1){
+		thread_block(TASK_BLOCKED);
+		asm volatile("sti; hlt" : : : "memory");
+	}
+}
+
+
+void thread_yield(){
+	struct task_struct* cur = get_thread_ptr();
+	enum intr_status old_status = intr_disable();
+	ASSERT(!elem_find(&thread_ready_list, &cur->general_tag));
+	list_append(&thread_ready_list, &cur->general_tag);
+	cur->status = TASK_READY;
+	schedule();
+	intr_set_status(old_status);
+}
+
+
 //进行线程调度
 void schedule(){
 	ASSERT(intr_get_status() == INTR_OFF);
@@ -117,7 +138,9 @@ void schedule(){
 	}
 	else{
 	}
-	ASSERT(!list_empty(&thread_ready_list));
+	if(list_empty(&thread_ready_list)){
+		thread_unblock(idle_thread);
+	}
 	thread_tag = NULL;
 	thread_tag = list_pop(&thread_ready_list);
 	//我们由thread_tag来推得其对应的task_struct
@@ -134,6 +157,7 @@ void thread_init(void){
 	list_init(&thread_all_list);
 	lock_init(&pid_lock);
 	make_main_thread();
+	idle_thread = thread_start("idle", 10, idle, NULL);
 	put_str("thread init done\n");
 }
 

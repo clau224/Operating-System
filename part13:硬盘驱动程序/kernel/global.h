@@ -79,6 +79,7 @@ struct gdt_desc {
 #define PG_SIZE 4096
 
 #define DIV_ROUND_UP(X, STEP) ((X + STEP - 1) / (STEP))
+#define UNUSED __attribute__ ((unused))
 
 #define EFLAGS_MBS	(1 << 1)
 #define EFLAGS_IF_1	(1 << 9)

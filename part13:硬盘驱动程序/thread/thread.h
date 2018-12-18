@@ -106,6 +106,8 @@ struct task_struct* get_thread_ptr();
 
 void schedule();
 
+void thread_yield();
+
 //将线程设置为阻塞，调用者是希望被阻塞的线程
 void thread_block(enum task_status stat);
 

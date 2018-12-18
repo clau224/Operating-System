@@ -19,10 +19,10 @@ int main(void) {
    put_str("I am kernel\n");
    init_all();
    intr_enable();
-   process_execute(user_prog_a, "user_prog_a");
-   process_execute(user_prog_b, "user_prog_b");
-   thread_start("k_thread_a", 31, kernel_thread_a, "I am thread_a");
-   thread_start("k_thread_b", 15, kernel_thread_b, "I am thread_b");
+   //process_execute(user_prog_a, "user_prog_a");
+   //process_execute(user_prog_b, "user_prog_b");
+   //thread_start("k_thread_a", 31, kernel_thread_a, "I am thread_a");
+   //thread_start("k_thread_b", 15, kernel_thread_b, "I am thread_b");
 
    while(1);
    return 0;
@@ -70,9 +70,9 @@ void kernel_thread_b(void* arg) {
 }
 
 void user_prog_a(void) {
-   void* addr1 = malloc(16);
-   void* addr2 = malloc(32);
-   void* addr3 = malloc(64);
+   void* addr1 = malloc(1600);
+   void* addr2 = malloc(3211);
+   void* addr3 = malloc(6411);
    printf(" prog_a malloc addr:0x%x,0x%x,0x%x\n", (int)addr1, (int)addr2, (int)addr3);
 
    int cpu_delay = 100000;
@@ -85,9 +85,9 @@ void user_prog_a(void) {
 
 
 void user_prog_b(void) {
-   void* addr1 = malloc(17);
-   void* addr2 = malloc(33);
-   void* addr3 = malloc(65);
+   void* addr1 = malloc(1711);
+   void* addr2 = malloc(3311);
+   void* addr3 = malloc(6511);
    printf(" prog_b malloc addr:0x%x,0x%x,0x%x\n", (int)addr1, (int)addr2, (int)addr3);
 
    int cpu_delay = 100000;
