@@ -89,7 +89,7 @@ static void* palloc(struct pool* m_pool){
 
 //手动添加虚拟地址虚拟地址和物理地址之间的映射
 static void page_table_add(void* _vaddr, void* _page_phy_addr){
-	uint32_t vaddr = (uint32_t)_vaddr, page_phy_addr = (uint32_t)page_phy_addr;
+	uint32_t vaddr = (uint32_t)_vaddr, page_phy_addr = (uint32_t)_page_phy_addr;
 	uint32_t* pde = pde_ptr(vaddr);
 	uint32_t* pte = pte_ptr(vaddr);
 

@@ -7,7 +7,7 @@ CC = gcc -m32
 LD = ld -m elf_i386
 
 LIB = -I lib/ -I lib/kernel/ -I kernel/ -I device/ -I thread/ -I userprog/ \
-		-I lib/user
+		-I lib/user/ -I fs/
 LIB_PRINT = -I lib/kernel/include/
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
       	$(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o \
@@ -17,7 +17,8 @@ OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
 	  	$(BUILD_DIR)/keyboard.o $(BUILD_DIR)/ioqueue.o $(BUILD_DIR)/tss.o \
 	  	$(BUILD_DIR)/process.o $(BUILD_DIR)/syscall.o $(BUILD_DIR)/stdio.o \
 	  	$(BUILD_DIR)/syscall-init.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/ide.o \
-	  	$(BUILD_DIR)/stdio-kernel.o
+	  	$(BUILD_DIR)/stdio-kernel.o $(BUILD_DIR)/fs.o $(BUILD_DIR)/dir.o \
+	  	$(BUILD_DIR)/file.o $(BUILD_DIR)/inode.o
 
 ASFLAGS = -f elf
 CFLAGS = $(LIB) -c -fno-builtin -fno-stack-protector
@@ -95,6 +96,17 @@ $(BUILD_DIR)/stdio-kernel.o: lib/kernel/stdio-kernel.c lib/kernel/stdio-kernel.h
 $(BUILD_DIR)/ide.o: device/ide.c device/ide.h thread/sync.h lib/stdio.h \
 	lib/kernel/stdio-kernel.h kernel/interrupt.h kernel/memory.h \
 	lib/string.h lib/string.h
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/fs.o: fs/fs.c fs/fs.h lib/stdint.h lib/kernel/list.h \
+	lib/string.h kernel/global.h kernel/debug.h kernel/memory.h \
+	lib/kernel/stdio-kernel.h device/ide.h fs/super_block.h  fs/inode.h \
+	fs/dir.h
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/dir.o: fs/dir.c fs/dir.h 
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/file.o: fs/file.c fs/file.h 
+	$(CC) $(CFLAGS) $< -o $@
+$(BUILD_DIR)/inode.o: fs/inode.c fs/inode.h 
 	$(CC) $(CFLAGS) $< -o $@
 
 

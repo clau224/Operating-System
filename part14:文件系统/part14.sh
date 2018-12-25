@@ -7,6 +7,7 @@ bximage -hd -mode="flat" -size=60 -q hd60M.img
 
 while true; do
 read -p "please input the path of hd80M.img you have prepared: " your_path
+your_path='/home/garvin/bochs/bochs-2.6.9/bin/img/hd80M.img'
 if [ ! -f $your_path ]; then
 	echo "文件不存在"
 else
@@ -15,8 +16,9 @@ fi
 done
 while true; do
 read -p "please input the path of hd80M.img that you have set in bochserc.txt : " target_path
-if [ ! -f $your_path ]; then
-	echo "文件不存在"
+target_path='/home/garvin/bochs/bochs-2.6.9/bin/'
+if [ ! -d $target_path ]; then
+	echo "路径不存在"
 else
 	break
 fi

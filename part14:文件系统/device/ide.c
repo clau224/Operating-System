@@ -167,7 +167,7 @@ static bool busy_wait(struct disk* hd) {
 }
 
 //从硬盘读取sec_cnt个扇区到buf
-void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   // 此处的sec_cnt为32位大小
+void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){   // 此处的sec_cnt为32位大小
    	ASSERT(lba <= max_lba);
    	ASSERT(sec_cnt > 0);
    	lock_acquire (&hd->my_channel->lock);
@@ -189,7 +189,7 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   //
    		//设置待读入的扇区数和起始扇区号
       	select_sector(hd, lba + secs_done, secs_op);
 
-    	//设置指令，读扇区
+    	   //设置指令，读扇区
       	cmd_out(hd->my_channel, CMD_READ_SECTOR);
 
 	   	//当磁盘在读写数据时，把自己阻塞
@@ -210,7 +210,7 @@ void ide_read(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {   //
 }
 
 //将buf中sec_cnt扇区数据写入硬盘
-void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt) {
+void ide_write(struct disk* hd, uint32_t lba, void* buf, uint32_t sec_cnt){
    	ASSERT(lba <= max_lba);
    	ASSERT(sec_cnt > 0);
    	lock_acquire (&hd->my_channel->lock);
