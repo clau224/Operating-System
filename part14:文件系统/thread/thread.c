@@ -50,24 +50,6 @@ static void kernel_thread(thread_func* function, void* func_arg){
 	function(func_arg);
 }
 
-//新建线程调用的是该函数，设置线程名称，优先级，线程执行函数和该函数参数
-struct task_struct* thread_start(char* name, int prio, thread_func function, void* func_arg){
-	struct task_struct* thread = get_kernel_pages(1);
-	
-	init_thread(thread, name, prio);
-	
-	thread_create(thread, function, func_arg);
-
-	ASSERT(!elem_find(&thread_ready_list, &thread->general_tag));
-	list_append(&thread_ready_list, &thread->general_tag);
-
-	ASSERT(!elem_find(&thread_all_list, &thread->all_list_tag));
-	list_append(&thread_all_list, &thread->all_list_tag);	
-
-	return thread;
-}
-
-
 void init_thread(struct task_struct* pthread, char* name, int prio){
 	memset(pthread, 0, sizeof(*pthread));
 	strcpy(pthread->name, name);
@@ -96,7 +78,6 @@ void init_thread(struct task_struct* pthread, char* name, int prio){
    	}
 }
 
-
 void thread_create(struct task_struct* pthread, thread_func function, void* func_arg){
 	//在页表的顶端让出intr_stack和thread_stack的空间
 	pthread->self_kstack -= sizeof(struct intr_stack);
@@ -108,6 +89,24 @@ void thread_create(struct task_struct* pthread, thread_func function, void* func
 	s->func_arg = func_arg;
 	s->ebp = s->ebx = s->esi = s->edi = 0;
 }
+
+//新建线程调用的是该函数，设置线程名称，优先级，线程执行函数和该函数参数
+struct task_struct* thread_start(char* name, int prio, thread_func function, void* func_arg){
+	struct task_struct* thread = get_kernel_pages(1);
+	
+	init_thread(thread, name, prio);
+	
+	thread_create(thread, function, func_arg);
+
+	ASSERT(!elem_find(&thread_ready_list, &thread->general_tag));
+	list_append(&thread_ready_list, &thread->general_tag);
+
+	ASSERT(!elem_find(&thread_all_list, &thread->all_list_tag));
+	list_append(&thread_all_list, &thread->all_list_tag);	
+
+	return thread;
+}
+
 
 static void make_main_thread(void){
 	main_thread = get_thread_ptr();
@@ -135,6 +134,31 @@ void thread_yield(){
 	intr_set_status(old_status);
 }
 
+//将线程设置为阻塞，调用者是希望被阻塞的线程
+void thread_block(enum task_status stat){
+	ASSERT((stat == TASK_BLOCKED || stat == TASK_WAITING || stat == TASK_HANGING));
+	enum intr_status old_status = intr_disable();
+	struct task_struct* cur = get_thread_ptr();
+	cur->status = stat;
+	schedule();
+	intr_set_status(old_status);
+}
+
+//将线程解除阻塞，调用者是执行V操作的线程
+void thread_unblock(struct task_struct* pthread){
+	enum intr_status old_status = intr_disable();
+	ASSERT((pthread->status == TASK_BLOCKED || pthread->status == TASK_WAITING || pthread->status == TASK_HANGING));
+	if(pthread->status != TASK_READY){
+		ASSERT(!elem_find(&thread_ready_list, &pthread->general_tag));
+		if (elem_find(&thread_ready_list, &pthread->general_tag)) {
+	        PANIC("thread_unblock: blocked thread in ready_list\n");
+	    }
+		list_push(&thread_ready_list, &pthread->general_tag);
+		pthread->status = TASK_READY;
+	}
+	intr_set_status(old_status);
+}
+
 
 //进行线程调度
 void schedule(){
@@ -152,6 +176,7 @@ void schedule(){
 	if(list_empty(&thread_ready_list)){
 		thread_unblock(idle_thread);
 	}
+	ASSERT(!list_empty(&thread_ready_list));
 	thread_tag = NULL;
 	thread_tag = list_pop(&thread_ready_list);
 	//我们由thread_tag来推得其对应的task_struct
@@ -171,29 +196,4 @@ void thread_init(void){
 	idle_thread = thread_start("idle", 10, idle, NULL);
 	put_str("thread init done\n");
 }
-
-//将线程设置为阻塞，调用者是希望被阻塞的线程
-void thread_block(enum task_status stat){
-	ASSERT((stat == TASK_BLOCKED || stat == TASK_WAITING || stat == TASK_HANGING));
-	enum intr_status old_status = intr_disable();
-	struct task_struct* cur = get_thread_ptr();
-	cur->status = stat;
-	schedule();
-	intr_set_status(old_status);
-}
-
-//将线程解除阻塞，调用者是执行V操作的线程
-void thread_unblock(struct task_struct* pthread){
-	enum intr_status old_status = intr_disable();
-	ASSERT((pthread->status == TASK_BLOCKED || pthread->status == TASK_WAITING || pthread->status == TASK_HANGING));
-	if(pthread->status != TASK_READY){
-		ASSERT(!elem_find(&thread_ready_list, &pthread->general_tag));
-		list_push(&thread_ready_list, &pthread->general_tag);
-		pthread->status = TASK_READY;
-	}
-	intr_set_status(old_status);
-}
-
-
-
 

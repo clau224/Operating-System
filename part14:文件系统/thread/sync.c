@@ -69,6 +69,7 @@ void lock_release(struct lock* plock){
 		plock->holder_repeat_nr--;
 		return;
 	}
+	ASSERT(plock->holder_repeat_nr == 1);
 	plock->holder = NULL;
 	plock->holder_repeat_nr = 0;
 	sema_up(&plock->sema);

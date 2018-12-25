@@ -19,11 +19,16 @@ void user_prog_b(void);
 int main(void) {
    put_str("I am kernel\n");
    init_all();
-   //process_execute(user_prog_a, "user_prog_a");
-   //process_execute(user_prog_b, "user_prog_b");
-   //thread_start("k_thread_a", 31, kernel_thread_a, "I am thread_a");
-   //thread_start("k_thread_b", 15, kernel_thread_b, "I am thread_b");
-   sys_open("/file1", O_CREAT);
+   process_execute(user_prog_a, "user_prog_a");
+   process_execute(user_prog_b, "user_prog_b");
+   thread_start("k_thread_a", 31, kernel_thread_a, "I am thread_a");
+   //__asm__("xchg %%bx,%%bx" : : );
+   thread_start("k_thread_b", 31, kernel_thread_b, "I am thread_b");
+   //__asm__("xchg %%bx,%%bx" : : );
+   uint32_t fd1 = sys_open("/file1", O_CREAT);
+   printf("open: fd = %d", fd1);
+   sys_close(fd1);
+   printf("close: fd = %d", fd1);
    while(1);
    return 0;
 }

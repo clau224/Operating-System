@@ -41,9 +41,13 @@ void* get_kernel_pages(uint32_t pg_cnt);
 uint32_t* pte_ptr(uint32_t vaddr);
 uint32_t* pde_ptr(uint32_t vaddr);
 void* malloc_page(enum pool_flags pf, uint32_t pg_cnt);
+void malloc_init(void);
 uint32_t addr_virtual_to_phy(uint32_t vaddr);
 void* get_a_page(enum pool_flags pf, uint32_t vaddr);
+void* get_user_pages(uint32_t pg_cnt);
 void block_desc_init();
 void* sys_malloc();
+void mfree_page(enum pool_flags pf, void* _vaddr, uint32_t pg_cnt);
+void pfree(uint32_t pg_phy_addr);
 void sys_free(void* ptr);
 #endif

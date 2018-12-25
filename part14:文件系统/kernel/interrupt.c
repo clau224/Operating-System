@@ -164,7 +164,7 @@ void idt_init(void){
 enum intr_status intr_get_status(){
 	uint32_t eflags = 0;
 	asm volatile("pushfl; popl %0" : "=g" (eflags));
-	return EFLAGS_IF & eflags ? INTR_ON : INTR_OFF;
+	return (EFLAGS_IF & eflags) ? INTR_ON : INTR_OFF;
 }
 
 enum intr_status intr_enable(){

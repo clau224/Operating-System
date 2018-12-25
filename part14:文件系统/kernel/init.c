@@ -24,5 +24,6 @@ void init_all(){
 	syscall_init();
 	intr_enable();
 	ide_init();
+	//__asm__("xchg %%bx,%%bx" : : );
 	filesys_init();
 }
