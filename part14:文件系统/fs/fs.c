@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "stdio-kernel.h"
+#include "console.h"
 #include "ide.h"
 #include "super_block.h"
 #include "inode.h"
@@ -322,10 +323,10 @@ int32_t sys_open(const char* pathname, uint8_t flags) {
       return -1;
    } 
    //若要创建的文件已存在
-   else if(found && flags & O_CREAT){
+   else if(found && (flags & O_CREAT)){
       printk("%s has already exist!\n", pathname);
       dir_close(searched_record.parent_dir);
-      return -1;
+      flags &= ~O_CREAT;
    }
 
    switch (flags & O_CREAT) {
@@ -427,5 +428,44 @@ void filesys_init() {
    while (fd_idx < MAX_FILE_OPEN) {
       file_table[fd_idx++].fd_inode = NULL;
    }
+}
+
+//write系统调用，将buf中连续count个字节写入到文件描述符所代表文件中
+//成功返回写入的字节数，失败返回-1
+int32_t sys_write(int32_t fd, const void* buf, uint32_t count){
+   if(fd < 0){
+      printk("sys_write: fd error\n");
+      return -1;
+   }
+   //如果是向屏幕输出
+   if(fd == stdout_no){  
+      char tmp_buf[1024] = {0};
+      memcpy(tmp_buf, buf, count);
+      console_put_str(tmp_buf);
+      return count;
+   }
+   //转换为全局描述符表中该文件的下表
+   uint32_t _fd = fd_local_to_global(fd);
+   struct file* wr_file = &file_table[_fd];
+   //只有设置为只写或读写才能写文件，只单纯创建不可以
+   if (wr_file->fd_flag & O_WRONLY || wr_file->fd_flag & O_RDWR) {
+      uint32_t bytes_written  = file_write(wr_file, buf, count);
+      return bytes_written;
+   } 
+   else{
+      console_put_str("sys_write: not allowed to write file without flag O_RDWR or O_WRONLY\n");
+      return -1;
+   }
+}
+
+//从文件fd中，读取count个字节到buf中，成功返回读出的字节数
+int32_t sys_read(int32_t fd, void* buf, uint32_t count){
+   if(fd < 0){
+      printk("sys_read: fd error\n");
+      return -1;
+   }
+   ASSERT(buf != NULL);
+   uint32_t _fd = fd_local_to_global(fd);
+   return file_read(&file_table[_fd], buf, count);
 }
 

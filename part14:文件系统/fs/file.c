@@ -223,3 +223,320 @@ int32_t file_close(struct file* f){
    return 0;
 }
 
+int32_t file_write(struct file* file, const void* buf, uint32_t count){
+   //若当前文件大小在写入buf中count大小数据后，超过文件支持大小则返回
+   //文件目前最大只支持512*140=71680字节
+   if ((file->fd_inode->i_size + count) > (BLOCK_SIZE * 140))  { 
+      printk("exceed max file_size 71680 bytes, write file failed\n");
+      return -1;
+   }
+   //申请一块缓冲区
+   uint8_t* io_buf = sys_malloc(BLOCK_SIZE);
+   if (io_buf == NULL) {
+      printk("file_write: sys_malloc for io_buf failed\n");
+      return -1;
+   }
+   //all_block中装有所有的块地址，12个直接块指针，128个一级块指针
+   uint32_t* all_blocks = (uint32_t*)sys_malloc(BLOCK_SIZE + 48);   // 用来记录文件所有的块地址
+   if (all_blocks == NULL) {
+      printk("file_write: sys_malloc for all_blocks failed\n");
+      return -1;
+   }
+   //用src作为操作指针
+   const uint8_t* src = buf; 
+   //已写入数据大小
+   uint32_t bytes_written = 0;
+   //未写入数据大小  
+   uint32_t size_left = count;
+   //块地址
+   int32_t block_lba = -1;
+   //用来记录block对应于block_bitmap中的索引,做为参数传给bitmap_sync
+   uint32_t block_bitmap_idx = 0;
+   //用来索引扇区
+   uint32_t sec_idx;
+   //扇区地址
+   uint32_t sec_lba;
+   //扇区内字节偏移量
+   uint32_t sec_off_bytes;
+   //扇区内剩余字节量
+   uint32_t sec_left_bytes;
+   //每次写入硬盘的数据块大小
+   uint32_t chunk_size;
+   //用来获取一级间接表地址
+   int32_t indirect_block_table;
+   //块索引
+   uint32_t block_idx;
+
+   //判断文件是否是第一次写
+   if(file->fd_inode->i_sectors[0] == 0){
+      //分配一个块
+      block_lba = block_bitmap_alloc(cur_part);
+      if(block_lba == -1){
+         printk("file_write: block_bitmap_alloc failed\n");
+         return -1;
+      }
+      file->fd_inode->i_sectors[0] = block_lba;
+
+      //每分配一个块就将位图实时写回到硬盘
+      block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+      ASSERT(block_bitmap_idx != 0);
+      bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+   }
+   //分别计算写入前和写入后，文件的块数，并判断是否需要申请新扇区
+   uint32_t file_has_used_blocks = file->fd_inode->i_size / BLOCK_SIZE + 1;
+   uint32_t file_will_use_blocks = (file->fd_inode->i_size + count) / BLOCK_SIZE + 1;
+   ASSERT(file_will_use_blocks <= 140);
+   uint32_t add_blocks = file_will_use_blocks - file_has_used_blocks;
+   //不需要申请新扇区，
+   if(add_blocks == 0){
+      //文件数据量将在12块之内
+      if(file_has_used_blocks <= 12){
+         //指向最后一个已有数据的扇区
+         block_idx = file_has_used_blocks - 1;
+         all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx];
+      } 
+      //使用了间接块
+      else{
+         ASSERT(file->fd_inode->i_sectors[12] != 0);
+         //先读出一级块地址
+         indirect_block_table = file->fd_inode->i_sectors[12];
+         //把一级块读到all_block里
+         ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);
+      }
+   }
+   //写入count个字节需要申请新的扇区的话
+   else{
+      if(file_will_use_blocks <= 12){
+         //count个字节需要分成两部分写入到两个或多个扇区扇区
+         //现将第一个扇区写入到all_blocks
+         block_idx = file_has_used_blocks - 1;
+         ASSERT(file->fd_inode->i_sectors[block_idx] != 0);
+         all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx];
+         //指向第一个要分配的新扇区
+         block_idx = file_has_used_blocks;
+         while(block_idx < file_will_use_blocks){
+            block_lba = block_bitmap_alloc(cur_part);
+            if(block_lba == -1){
+               printk("file_write: block_bitmap_alloc for situation 1 failed\n");
+               return -1;
+            }
+            ASSERT(file->fd_inode->i_sectors[block_idx] == 0);
+            file->fd_inode->i_sectors[block_idx] = all_blocks[block_idx] = block_lba;
+
+            /* 每分配一个块就将位图同步到硬盘 */
+            block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+            bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+
+            block_idx++;   // 下一个分配的新扇区
+         }
+      }
+      //第二种情况: 旧数据在12个直接块内,新数据将使用间接块
+      else if (file_has_used_blocks <= 12 && file_will_use_blocks > 12){
+         block_idx = file_has_used_blocks - 1;
+         all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx];
+
+         //创建一级间接块表
+         block_lba = block_bitmap_alloc(cur_part);
+         if(block_lba == -1){
+            printk("file_write: block_bitmap_alloc for situation 2 failed\n");
+            return -1;
+         }
+         ASSERT(file->fd_inode->i_sectors[12] == 0);
+         //分配一级间接块索引表
+         indirect_block_table = block_lba;
+         file->fd_inode->i_sectors[12] = block_lba;
+
+         block_idx = file_has_used_blocks;
+         while (block_idx < file_will_use_blocks) {
+            block_lba = block_bitmap_alloc(cur_part);
+            if (block_lba == -1) {
+               printk("file_write: block_bitmap_alloc for situation 2 failed\n");
+               return -1;
+            }
+            //如果是直接块，则将获取的块地址直接放到all_blocks里
+            if(block_idx < 12){
+               //确保尚未分配扇区地址
+               ASSERT(file->fd_inode->i_sectors[block_idx] == 0);
+               file->fd_inode->i_sectors[block_idx] = block_lba;
+               all_blocks[block_idx] = block_lba;
+            }
+            //间接块只写入到all_block数组中,待全部分配完成后一次性同步到硬盘
+            else{
+               all_blocks[block_idx] = block_lba;
+            }
+            //依旧每分配一个块就将位图同步到硬盘
+            block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+            bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+            
+            block_idx++;
+         }
+         //统一把一级块上的块表同步到硬盘
+         ide_write(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);
+      }
+      //第三种情况是旧数据新数据都在一级块中
+      else if (file_has_used_blocks > 12) {
+         //已经具备了一级间接块表
+         ASSERT(file->fd_inode->i_sectors[12] != 0);
+         //获取一级间接表地址
+         indirect_block_table = file->fd_inode->i_sectors[12];
+
+         //把一级块读进来
+         ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1); 
+
+         block_idx = file_has_used_blocks;     
+         while(block_idx < file_will_use_blocks){
+            block_lba = block_bitmap_alloc(cur_part);
+            if(block_lba == -1){
+               printk("file_write: block_bitmap_alloc for situation 3 failed\n");
+               return -1;
+            }
+            all_blocks[block_idx++] = block_lba;
+            //依旧每分配一个块就将位图同步到硬盘
+            block_bitmap_idx = block_lba - cur_part->sb->data_start_lba;
+            bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+         }
+         ide_write(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);   // 同步一级间接块表到硬盘
+      } 
+   }
+   //判断是否含有剩余扇区的标志
+   bool first_write_block = true;
+   //准备完毕，开始写数据
+   //置fd_pos为文件的最后，方便写入
+   file->fd_pos = file->fd_inode->i_size - 1;
+   while(bytes_written < count){
+      memset(io_buf, 0, BLOCK_SIZE);
+      sec_idx = file->fd_inode->i_size / BLOCK_SIZE;
+      sec_lba = all_blocks[sec_idx];
+      sec_off_bytes = file->fd_inode->i_size % BLOCK_SIZE;
+      sec_left_bytes = BLOCK_SIZE - sec_off_bytes;
+
+      chunk_size = size_left < sec_left_bytes ? size_left : sec_left_bytes;
+      //若是第一次读取，都需要将该块读出来，拷贝到io_buf中
+      if(first_write_block){
+         ide_read(cur_part->my_disk, sec_lba, io_buf, 1);
+         first_write_block = false;
+      }
+      memcpy(io_buf + sec_off_bytes, src, chunk_size);
+      ide_write(cur_part->my_disk, sec_lba, io_buf, 1);
+
+      src += chunk_size;
+      file->fd_inode->i_size += chunk_size;
+      file->fd_pos += chunk_size;   
+      bytes_written += chunk_size;
+      size_left -= chunk_size;
+   }
+   //同步inode
+   inode_sync(cur_part, file->fd_inode, io_buf);
+   sys_free(all_blocks);
+   sys_free(io_buf);
+   return bytes_written;
+}
+
+int32_t file_read(struct file* file, void* buf, uint32_t count){
+   uint8_t* buf_dst = (uint8_t*)buf;
+   uint32_t size = count, size_left = size;
+   //若文件剩余的可读字节数少于count, 就用剩余量做为count */
+   if ((file->fd_pos + count) > file->fd_inode->i_size)  {
+      size = file->fd_inode->i_size - file->fd_pos;
+      size_left = size;
+      if (size == 0) {     // 若到文件尾则返回-1
+         return -1;
+      }
+   }
+   uint8_t* io_buf = sys_malloc(BLOCK_SIZE);
+   if(io_buf == NULL){
+      printk("file_read: sys_malloc for io_buf failed\n");
+      return -1;
+   }
+   //用来记录文件所有的块地址，一共需要存放128+12个块地址
+   uint32_t* all_blocks = (uint32_t*)sys_malloc(BLOCK_SIZE + 48);
+   if (all_blocks == NULL) {
+      printk("file_read: sys_malloc for all_blocks failed\n");
+      return -1;
+   }
+
+   //数据所在块的起始地址
+   uint32_t block_read_start_idx = file->fd_pos / BLOCK_SIZE;    
+   //数据所在块的终止地址
+   uint32_t block_read_end_idx = (file->fd_pos + size) / BLOCK_SIZE;
+   //如增量为0,表示数据在同一扇区
+   uint32_t read_blocks = block_read_start_idx - block_read_end_idx;
+   ASSERT(block_read_start_idx < 139 && block_read_end_idx < 139);
+   //用来获取一级间接表地址
+   int32_t indirect_block_table;
+   //获取待读的块地址
+   uint32_t block_idx;
+
+   //增量为0，,不涉及到跨扇区读取
+   if (read_blocks == 0){
+      ASSERT(block_read_end_idx == block_read_start_idx);
+      //待读的数据在12个直接块之内
+      if(block_read_end_idx < 12){
+         block_idx = block_read_end_idx;
+         all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx];
+      }
+      //若用到了一级间接块表,需要将表中间接块读进来
+      else{
+         indirect_block_table = file->fd_inode->i_sectors[12];
+         ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);
+      }
+   } 
+   //要读多个块
+   else{
+      //若起始块终止块都是直接块
+      if(block_read_end_idx < 12 ){
+         //数据结束所在的块属于直接块
+         block_idx = block_read_start_idx; 
+         while(block_idx <= block_read_end_idx){
+            all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx]; 
+            block_idx++;
+         }
+      }
+      //起始块是直接块，终止块在一级间接块中
+      else if(block_read_start_idx < 12 && block_read_end_idx >= 12){
+         block_idx = block_read_start_idx;
+         while (block_idx < 12) {
+            all_blocks[block_idx] = file->fd_inode->i_sectors[block_idx];
+            block_idx++;
+         }
+         //确保已经分配了一级间接块表
+         ASSERT(file->fd_inode->i_sectors[12] != 0);
+
+         //再将一级间接块地址写入all_blocks
+         indirect_block_table = file->fd_inode->i_sectors[12];
+         ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);       // 将一级间接块表读进来写入到第13个块的位置之后
+      } 
+      //起始块终止块都在一级间接块中
+      else{
+         ASSERT(file->fd_inode->i_sectors[12] != 0);
+         //获取一级间接表地址
+         indirect_block_table = file->fd_inode->i_sectors[12];
+         ide_read(cur_part->my_disk, indirect_block_table, all_blocks + 12, 1);       // 将一级间接块表读进来写入到第13个块的位置之后
+      } 
+   }
+
+   //用到的块地址已经收集到all_blocks中,下面开始读数据
+   uint32_t sec_idx, sec_lba, sec_off_bytes, sec_left_bytes, chunk_size;
+   uint32_t bytes_read = 0;
+   while (bytes_read < size) {
+      sec_idx = file->fd_pos / BLOCK_SIZE;
+      sec_lba = all_blocks[sec_idx];
+      sec_off_bytes = file->fd_pos % BLOCK_SIZE;
+      sec_left_bytes = BLOCK_SIZE - sec_off_bytes;
+      
+      chunk_size = size_left < sec_left_bytes ? size_left : sec_left_bytes;        // 待读入的数据大小
+
+      memset(io_buf, 0, BLOCK_SIZE);
+      ide_read(cur_part->my_disk, sec_lba, io_buf, 1);
+      memcpy(buf_dst, io_buf + sec_off_bytes, chunk_size);
+
+      buf_dst += chunk_size;
+      file->fd_pos += chunk_size;
+      bytes_read += chunk_size;
+      size_left -= chunk_size;
+   }
+   sys_free(all_blocks);
+   sys_free(io_buf);
+   return bytes_read;
+}
+

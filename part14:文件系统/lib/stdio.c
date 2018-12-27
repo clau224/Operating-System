@@ -5,10 +5,6 @@
 #include "syscall.h"
 #include "print.h"
 
-#define va_start(ap, v) ap = (va_list)&v 
-#define va_arg(ap, t) *((t*)(ap += 4))
-#define va_end(ap) ap = NULL
-
 /*将整数转换为字符串，因为参数是无符号数，所以未判断符号*/
 static void itoa(uint32_t value, char** buf, uint8_t base){
 	uint32_t mod = value % base;
@@ -78,7 +74,7 @@ uint32_t printf(const char* format, ...){
 	char buf[1024] = {0};
 	vsprintf(buf, format, args);
 	va_end(args);
-	return write(buf);
+	return write(1, buf, strlen(buf));
 }
 
 uint32_t sprintf(char* buf, const char* format, ...){

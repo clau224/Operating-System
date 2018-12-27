@@ -57,14 +57,26 @@ char* gettname(){
    return (char*)_syscall0(SYS_GETTNAME);
 }
 
-uint32_t write(char* str){
-	return _syscall1(SYS_WRITE, str);
-}
-
 void* malloc(uint32_t size){
    return (void*)_syscall1(SYS_MALLOC, size);
 }
 
 void free(void* ptr){
    _syscall1(SYS_FREE, ptr);
+}
+
+uint32_t write(int32_t fd, const void* buf, uint32_t count){
+   return _syscall3(SYS_WRITE, fd, buf, count);
+}
+
+uint32_t read(int32_t fd, const void* buf, uint32_t count){
+   return _syscall3(SYS_READ, fd, buf, count);
+}
+
+void lock(struct lock* lck){
+   _syscall1(SYS_LOCK_ACQUIRE, lck);
+}
+
+void unlock(struct lock* lck){
+   _syscall1(SYS_LOCK_RELEASE, lck);
 }
