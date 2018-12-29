@@ -22,7 +22,7 @@ int32_t u_sync_printf(char* format, ...);
 
 struct lock printlock;
 
-int main(void) {
+int main(void){
    put_str("I am kernel\n");
    init_all();
    lock_init(&printlock);
@@ -36,25 +36,36 @@ int main(void) {
    uint32_t fd1 = sys_open("/file1", O_CREAT | O_RDWR);
    k_sync_printf("open file1: fd = %d\n", fd1);
 
-   uint32_t fd2 = sys_open("/file2", O_CREAT | O_RDWR);
-   k_sync_printf("open file2: fd = %d\n", fd2);
+   //uint32_t fd2 = sys_open("/file2", O_CREAT | O_RDWR);
+   //k_sync_printf("open file2: fd = %d\n", fd2);
 
-   sys_write(fd1, "Hello World\n", sizeof("Hello World\n"));
+   sys_write(fd1, "Hello World\n", 12);
    k_sync_printf("write file1: Hello World\n");
-   sys_write(fd2, "I am kernel\n", sizeof("I am kernel\n"));
-   k_sync_printf("write file2: I am kernel\n");
+   sys_write(fd1, "I am kernel\n", 12);
+   k_sync_printf("write file1: I am kernel\n");
 
-   sys_close(fd2);
-   k_sync_printf("close: fd =%d\n", fd2);
+   //sys_close(fd2);
+   //k_sync_printf("close: fd =%d\n", fd2);
 
    sys_close(fd1);
    k_sync_printf("close: fd =%d\n", fd1);
 
-   char* buf = (char*)malloc(60*sizeof(char));
-   memset(buf, 0, 64);
+
+   char* buf = malloc(60*sizeof(char));
+
+   memset(buf, 0, 60);
    uint32_t fd = sys_open("/file1", O_RDWR);
-   uint32_t read_byte = sys_read(fd, buf, 12);
-   k_sync_printf("read file1: %s\n", buf);
+   int a = sys_read(fd, buf, 12);
+   k_sync_printf("read file1(%d characters): %s", a, buf);
+
+   memset(buf, 0, 60);
+   a = sys_read(fd, buf, 12);
+   k_sync_printf("read file1(%d characters): %s", a, buf);
+
+   memset(buf, 0, 60);
+   sys_lseek(fd, 0, SEEK_SET);
+   a = sys_read(fd, buf, 12);
+   k_sync_printf("read file1(%d characters): %s", a, buf);
 
    while(1);
    return 0;

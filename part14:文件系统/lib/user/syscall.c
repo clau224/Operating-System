@@ -80,3 +80,7 @@ void lock(struct lock* lck){
 void unlock(struct lock* lck){
    _syscall1(SYS_LOCK_RELEASE, lck);
 }
+
+int32_t lseek(int32_t fd, int32_t offset, uint8_t whence){
+   return _syscall3(SYS_LSEEK, fd, offset, whence);
+}

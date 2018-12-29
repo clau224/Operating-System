@@ -30,6 +30,7 @@ void syscall_init(void){
 	syscall_table[SYS_FREE] = sys_free;
 	syscall_table[SYS_LOCK_ACQUIRE] = lock_acquire;
 	syscall_table[SYS_LOCK_RELEASE] = lock_release;
+	syscall_table[SYS_LSEEK] = sys_lseek;
 
 	put_str("syscall_init done\n");
 }

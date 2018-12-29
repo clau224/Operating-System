@@ -29,7 +29,7 @@ $(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h lib/stdint.h \
 	kernel/init.h kernel/memory.h thread/thread.h kernel/interrupt.h \
 	device/console.h device/keyboard.h device/ioqueue.h \
 	userprog/process.h userprog/syscall-init.h lib/user/syscall.h \
-	lib/stdio.h
+	lib/stdio.h fs/fs.h
 	$(CC) $(CFLAGS) $< -o $@
 $(BUILD_DIR)/init.o: kernel/init.c kernel/init.h lib/kernel/print.h \
 	lib/stdint.h kernel/interrupt.h device/timer.h device/console.h \

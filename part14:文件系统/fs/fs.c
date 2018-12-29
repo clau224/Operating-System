@@ -430,8 +430,8 @@ void filesys_init() {
    }
 }
 
-//write系统调用，将buf中连续count个字节写入到文件描述符所代表文件中
-//成功返回写入的字节数，失败返回-1
+/*write系统调用，将buf中连续count个字节写入到文件描述符所代表文件中
+   成功返回写入的字节数，失败返回-1*/
 int32_t sys_write(int32_t fd, const void* buf, uint32_t count){
    if(fd < 0){
       printk("sys_write: fd error\n");
@@ -467,5 +467,39 @@ int32_t sys_read(int32_t fd, void* buf, uint32_t count){
    ASSERT(buf != NULL);
    uint32_t _fd = fd_local_to_global(fd);
    return file_read(&file_table[_fd], buf, count);
+}
+
+/*重置用于文件读写操作的偏移指针,成功时返回新的偏移量,出错时返回-1*/
+int32_t sys_lseek(int32_t fd, int32_t offset, uint8_t whence){
+   if (fd < 0) {
+      printk("sys_lseek: fd error\n");
+      return -1;
+   }
+   ASSERT(whence > 0 && whence < 4);
+   uint32_t _fd = fd_local_to_global(fd);
+   struct file* pf = &file_table[_fd];
+   //用于记录新的偏移量
+   int32_t new_pos = 0;
+   int32_t file_size = (int32_t)pf->fd_inode->i_size;
+   switch (whence) {
+      //新的读写位置是相对于文件开头再增加offset个位移量
+      case SEEK_SET:
+         new_pos = offset;
+         break;
+      //新的读写位置是相对于当前的位置增加offset个位移量
+      case SEEK_CUR:
+         new_pos = (int32_t)pf->fd_pos + offset;
+         break;
+
+      //新的读写位置是相对于文件尺寸再增加offset个位移量
+      //一般offset都为负值
+      case SEEK_END:
+         new_pos = file_size + offset;
+   }
+   if (new_pos < 0 || new_pos > (file_size - 1)) {  
+      return -1;
+   }
+   pf->fd_pos = new_pos;
+   return pf->fd_pos;
 }
 

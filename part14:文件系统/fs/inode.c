@@ -150,3 +150,50 @@ void inode_init(uint32_t inode_no, struct inode* new_inode) {
       sec_idx++;
    }
 }
+
+
+/* 回收inode的数据块和inode本身 */
+void inode_release(struct partition* part, uint32_t inode_no) {
+   struct inode* inode_to_del = inode_open(part, inode_no);
+   ASSERT(inode_to_del->i_no == inode_no);
+
+   uint8_t block_idx = 0, block_cnt = 12;
+   uint32_t block_bitmap_idx;
+   uint32_t all_blocks[140] = {0}; 
+
+   //下面要做的是把直接块和一级块(若存在)的地址放到all_blocks中
+   while(block_idx < 12){
+      all_blocks[block_idx] = inode_to_del->i_sectors[block_idx];
+      block_idx++;
+   }
+
+   if (inode_to_del->i_sectors[12] != 0) {
+      ide_read(part->my_disk, inode_to_del->i_sectors[12], all_blocks + 12, 1);
+      block_cnt = 140;
+
+      //因为一级块表不在all_blocks中，所以单独回收
+      block_bitmap_idx = inode_to_del->i_sectors[12] - part->sb->data_start_lba;
+      ASSERT(block_bitmap_idx > 0);
+      bitmap_set(&part->block_bitmap, block_bitmap_idx, 0);
+      bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+   }
+   
+   //inode所有的块地址已经收集到all_blocks中,下面逐个回收
+   block_idx = 0;
+   while (block_idx < block_cnt) {
+      if (all_blocks[block_idx] != 0) {
+         block_bitmap_idx = 0;
+         block_bitmap_idx = all_blocks[block_idx] - part->sb->data_start_lba;
+         ASSERT(block_bitmap_idx > 0);
+         bitmap_set(&part->block_bitmap, block_bitmap_idx, 0);
+         bitmap_sync(cur_part, block_bitmap_idx, BLOCK_BITMAP);
+      }
+      block_idx++; 
+   }
+
+   //回收完block_bitmap中被删除文件的bit位，接着回收inode_bitmap中的bit位
+   bitmap_set(&part->inode_bitmap, inode_no, 0);  
+   bitmap_sync(cur_part, inode_no, INODE_BITMAP);
+    
+   inode_close(inode_to_del);
+}
